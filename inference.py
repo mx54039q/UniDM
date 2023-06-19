@@ -104,15 +104,15 @@ def main():
     test_data = dataset["test"]
     logger.info(f"Test shape is {test_data.shape[0]}")
 
-    # UniFDT
+    # UniDM
     model = builder.build_model(args, logger)
         
     # Run 
-    trial_metrics = {"prec": [], "rec": [], "f1": [], "acc": []}
     preds = model.run(train_data, test_data)
-    gt = test_data["label_str"]
 
     # Metric
+    trial_metrics = {"prec": [], "rec": [], "f1": [], "acc": []}
+    gt = test_data["label_str"]
     prec, rec, acc, f1 = compute_metrics(preds, gt, args.task)
 
     logger.info(
@@ -146,8 +146,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-

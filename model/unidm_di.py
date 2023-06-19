@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # Copyright (C) Alibaba Group Holding Limited. All rights reserved.
+import os
 import pandas as pd
+import numpy as np
 
 from model.unidm_base import UniDM
 from utils.constants import IMPUTE_COLS
@@ -11,10 +13,9 @@ class UniDM_DataImputation(UniDM):
     def __init__(self, args, logger):
         super().__init__(args, logger)
         self.prompt_dp = "Given the items and convert the them into a textual format in a logical order.\n The items are %s\n"
-
         self.dataset_name = args.data_dir.split('/')[-1]
-        self.impute_col = constants.IMPUTE_COLS[dataset_name]
-        self.score_table = []
+        self.impute_col = IMPUTE_COLS[self.dataset_name]
+        self.load_score_table, self.score_table = [], []
 
     def metadata_retrieval(self, table):
         """
@@ -36,9 +37,9 @@ class UniDM_DataImputation(UniDM):
         """
         The Instance-wise component of the auto-retrieve module.
         """
-        if len(self.score_table) != 0:
+        if len(self.load_score_table) != 0:
             table = candidates.copy()
-            table["score"] = score_table[i]
+            table["score"] = self.load_score_table[i]
             table.sort_values(by=["score"],axis=0,ascending=False,inplace=True)
             table.reset_index(drop=True,inplace=True)
             table = table.drop('score',axis=1)
@@ -118,9 +119,9 @@ class UniDM_DataImputation(UniDM):
             column_map = {c: c for c in train_data.columns if c != "id" and c != self.impute_col and c != 'label_str'}
 
         # Load instance-retrieval result if exists
-        score_table_name = "dataset%s_candidate%d_ins%d.npy" % (self.dataset_name, self.context_num, self.instance_num)
+        score_table_name = "ret_score/dataset%s_candidate%d_ins%d.npy" % (self.dataset_name, self.context_num, self.instance_num)
         if os.path.exists(score_table_name):
-            self.score_table = np.load(score_table_name)
+            self.load_score_table = np.load(score_table_name)
 
         # 
         preds = []
@@ -147,7 +148,7 @@ class UniDM_DataImputation(UniDM):
             # Parse data into a natural text representation
             context = list(context)
             if self.Data_Parsing:
-                context = [model.data_parsing(c) for c in context]
+                context = [self.data_parsing(c) for c in context]
             context = ' '.join(context)
 
             # Recursively uses the LLM to transform data tasks to the effective format
@@ -163,9 +164,10 @@ class UniDM_DataImputation(UniDM):
             gen_text = self.apply_prompt(prompt=prompt_as)
             pred = list(filter(None,gen_text.split('\n')))[0]
             pred = pred.strip('\n')
-            print("ID: {} => Prediction: {}. Ground truth: {}. \n".format(i, pred, row['label_str'].strip()))
+            self.logger.info("ID: {} => Prediction: {}. Ground truth: {}. \n".format(i, pred, row['label_str'].strip()))
             
             preds.append(pred)
+            self.p_as.append(prompt_as)
 
         # Save the score table
         if self.instance_wise:
@@ -174,6 +176,3 @@ class UniDM_DataImputation(UniDM):
 
         return preds
 
-
-if __name__ == "__main__":
-    model = UniDM_DataImputation(args, logger)

@@ -14,5 +14,7 @@ def build_model(args, logger):
         UniDM = UniDM_DataTransformation(args, logger)
     elif args.task == "entity_resolution":
         UniDM = UniDM_EntityResolution(args, logger)
+    else:
+        raise ValueError('Unrecognized Task:%s.' % args.task)
 
     return UniDM

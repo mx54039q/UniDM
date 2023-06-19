@@ -41,6 +41,8 @@ DATA2DROPCOLS = {
     f"Hospital": [],
     f"Adult": [],
     f"Synthea": ["des1", "des2", "d1", "d2", "d3", "d4"],
+    f"benchmark-stackoverflow": [],
+    f"benchmark-bing-query-logs": [],
 }
 
 DATA2COLREMAP = {
@@ -76,5 +78,7 @@ DATA2COLREMAP = {
         "table": "right",
         "label": "label",
     },
+    f"benchmark-stackoverflow": {},
+    f"benchmark-bing-query-logs": {},
 }
 

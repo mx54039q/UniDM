@@ -26,12 +26,12 @@ def compute_metrics(preds: List, golds: List, task: str):
         label = label.strip().lower()
         pred = pred.strip().lower()
         mets["total"] += 1
-        if task in {"data_imputation"}:
+        if task in {"data_imputation"} or task in {"data_transformation"}:
             crc = pred == label
-        elif task in {"entity_matching"}:
+        elif task in {"entity_resolution"}:
             pred = "yes" if "yes" in pred else "no"
             crc = pred == label
-        elif task in {"entity_matching", "schema_matching", "error_detection_spelling"}:
+        elif task in {"entity_resolution", "schema_matching", "error_detection_spelling"}:
             crc = pred.startswith(label)
         elif task in {"error_detection"}:
             pred = pred.split("\n\n")[-1]

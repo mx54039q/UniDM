@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Copyright (C) Alibaba Group Holding Limited. All rights reserved.
-import logging
+import logging, os
 from functools import partial
 from pathlib import Path
 from typing import Dict, List
@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 def sample_train_data(train: pd.DataFrame, n_rows: int):
     res = train.sample(n_rows)
     return res
-
 
 def serialize_row(
     row: pd.core.series.Series,
@@ -34,7 +33,6 @@ def serialize_row(
         sep_tok = f" {sep_tok}"
     return f"{sep_tok} ".join(res)
 
-
 def serialize_match_pair(
     row: pd.core.series.Series,
     column_mapA: Dict[str, str],
@@ -49,7 +47,6 @@ def serialize_match_pair(
         f" {prod_name} B is {serialize_row(row, column_mapB, sep_tok, nan_tok)}."
     )
     return res
-
 
 def serialize_imputation(
     row: pd.core.series.Series,
@@ -92,6 +89,7 @@ def serialize_error_detection(
     column_map = {row["col_name"]: row["col_name"]}
     res = f"{entire_row}\n\nIs there an error in {serialize_row(row, column_map, sep_tok, nan_tok)}"
     return res
+
 
 def read_blocked_pairs(
     split_path: str,
@@ -167,6 +165,52 @@ def read_imputation_single(
     return table
 
 
+def read_transformation(
+    split_path: str,
+    dataset_name: str,
+    # cols_to_drop: List[str],
+    # col_renaming: Dict[str, str],
+    sep_tok: str,
+    nan_tok: str,
+) -> pd.DataFrame:
+    # table = pd.read_csv(split_path)
+    # for c in cols_to_drop:
+    #     table = table.drop(c, axis=1, inplace=False)
+    # if len(col_renaming) > 0:
+    #     table = table.rename(columns=col_renaming, inplace=False)
+    
+    table = []
+
+    for data in split_path:
+        if (dataset_name == "benchmark-stackoverflow" and data.endswith('.txt')) or \
+           (dataset_name == "benchmark-bing-query-logs" and data.endswith('.txt') and "semantic" in data):
+            file = pd.read_csv(data, sep="\t\t",  encoding='cp1252', 
+                names=["data before tansformation", "data after tansformation"], skiprows=1, engine='python')
+            with open(data, 'r') as f:
+                instruction = f.readlines()[0].strip("\n")
+        else:
+            continue
+
+        column_map = {c: c for c in file.columns}
+        train, test = file[:3], file[3:]
+
+        context = train.apply(
+            lambda row: serialize_row(
+                row,
+                column_map,
+                sep_tok,
+            ),
+            axis=1,
+        )
+        context = "\n\n".join(list(context))
+        
+        for _,row in test.iterrows():
+            table.append([instruction,context,str(row[0]),str(row[1])])
+
+    table = pd.DataFrame(table, columns=['instruction','context','input','label_str'])
+    return table
+
+
 def read_raw_data(
     task: str,
     data_dir: str,
@@ -181,7 +225,7 @@ def read_raw_data(
     cols_to_drop = constants.DATA2DROPCOLS[dataset_name]
     col_renaming = constants.DATA2COLREMAP[dataset_name]
     data_dir_p = Path(data_dir)
-    if task == "entity_matching":
+    if task == "entity_resolution":
         train_file = data_dir_p / "train.csv"
         valid_file = data_dir_p / "valid.csv"
         test_file = data_dir_p / "test.csv"
@@ -214,6 +258,17 @@ def read_raw_data(
             sep_tok=sep_tok,
             nan_tok=nan_tok,
         )
+    elif task == "data_transformation":
+        files = os.listdir(data_dir_p)
+        train_file = test_file = [os.path.join(data_dir_p, f) for f in files]
+        valid_file = data_dir_p / "valid.csv"
+        label_col = 'label_str'
+        read_data_func = partial(
+            read_transformation,
+            dataset_name=dataset_name,
+            sep_tok='\n', # sep_tok,
+            nan_tok=nan_tok,
+        )
     elif task == "error_detection":
         train_file = data_dir_p / "train.csv"
         valid_file = data_dir_p / "valid.csv"
@@ -235,12 +290,10 @@ def read_raw_data(
         raise ValueError(f"Task {task} not recognized.")
 
     data_files_sep["train"] = read_data_func(train_file)
+    data_files_sep["test"] = read_data_func(test_file)
     # Read validation
     if valid_file.exists():
         data_files_sep["validation"] = read_data_func(valid_file)
-    # Read test
-    if test_file.exists():
-        data_files_sep["test"] = read_data_func(test_file)
     return data_files_sep, label_col
 
 
