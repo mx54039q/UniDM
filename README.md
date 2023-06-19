@@ -62,8 +62,6 @@ python inference.py \
     --data_dir <DATA DIR> \
     --task data_transformation \
     --context_num 3 \
-    --metadata_wise \
-    --instance_wise \
     --data_parsing \
     --prompt_engineering
 ```
